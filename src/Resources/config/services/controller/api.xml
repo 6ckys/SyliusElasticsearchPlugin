@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<container xmlns="http://symfony.com/schema/dic/services" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://symfony.com/schema/dic/services http://symfony.com/schema/dic/services/services-1.0.xsd">
+    <services>
+        <service id="bitbag_sylius_elasticsearch_plugin.controller.action.shop.auto_complete_product_name" class="BitBag\SyliusElasticsearchPlugin\Controller\Action\Api\ListProductsByPartialNameAction">
+            <argument type="service" id="bitbag_sylius_elasticsearch_plugin.finder.named_products" />
+            <argument type="service" id="BitBag\SyliusElasticsearchPlugin\Transformer\Product\SlugTransformer" />
+            <argument type="service" id="BitBag\SyliusElasticsearchPlugin\Transformer\Product\ChannelPricingTransformer" />
+            <argument type="service" id="BitBag\SyliusElasticsearchPlugin\Transformer\Product\ImageTransformer" />
+            <argument type="service" id="Sylius\Bundle\ResourceBundle\Controller\RequestConfigurationFactoryInterface" />
+            <argument type="service">
+                <service class="Sylius\Component\Resource\Metadata\MetadataInterface">
+                    <factory service="sylius.resource_registry" method="get" />
+                    <argument type="string">sylius.product</argument>
+                </service>
+            </argument>
+            <argument type="service" id="Sylius\Bundle\ResourceBundle\Controller\ViewHandlerInterface" />
+            <argument type="service" id="App\Serializer\ProductNormalizer" />
+            <argument>%bitbag_es_min_limit_search%</argument>
+            <argument>%bitbag_es_max_limit_search%</argument>
+            <tag name="controller.service_arguments" />
+        </service>
+    </services>
+</container>

@@ -1,0 +1,18 @@
+parameters:
+    bitbag_es_shop_option_taxons_property: option_taxons
+
+fos_elastica:
+    indexes:
+        bitbag_option_taxons:
+            index_name: "%bitbag_es_index_prefix%bitbag_option_taxons_%kernel.environment%"
+            properties:
+                option_code:
+                    property_path: code
+            persistence:
+                driver: orm
+                model: "%sylius.model.product_option.class%"
+                listener:
+                    defer: false
+                    logger: true
+                elastica_to_model_transformer:
+                    ignore_missing: true

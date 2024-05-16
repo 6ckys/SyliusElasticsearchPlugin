@@ -1,0 +1,30 @@
+parameters:
+    bitbag_es_shop_channels_property: channels
+    bitbag_es_shop_brand_property: brand
+    bitbag_es_shop_enabled_property: enabled
+    bitbag_es_shop_product_taxons_property: product_taxons
+    bitbag_es_shop_product_sold_units: sold_units
+    bitbag_es_shop_product_created_at: product_created_at
+    bitbag_es_shop_name_property_prefix: name
+    bitbag_es_shop_product_price_property_prefix: price
+    bitbag_es_shop_option_property_prefix: option
+    bitbag_es_shop_brand_property_prefix: brand
+    bitbag_es_shop_attribute_property_prefix: attribute
+    bitbag_es_shop_description_property_prefix: description
+    bitbag_es_shop_short_description_property_prefix: short_description
+    bitbag_es_shop_taxon_position_property_prefix: taxon_position
+
+fos_elastica:
+    indexes:
+        bitbag_shop_product:
+            index_name: "%bitbag_es_index_prefix%bitbag_shop_products_%kernel.environment%"
+            properties:
+                enabled: ~
+            persistence:
+                driver: orm
+                model: "%sylius.model.product.class%"
+                listener:
+                    defer: false
+                    logger: true
+                elastica_to_model_transformer:
+                    ignore_missing: true
