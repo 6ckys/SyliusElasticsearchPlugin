@@ -47,7 +47,7 @@ final class ListProductsByPartialNameAction extends ResourceController
     protected int $minLimit;
 
     protected int $maxLimit;
-    
+
     public function __construct(
         NamedProductsFinderInterface $namedProductsFinder,
         TransformerInterface $productSlugResolver,
@@ -82,12 +82,12 @@ final class ListProductsByPartialNameAction extends ResourceController
         }
 
         $file = fopen("/srv/sylius/public/es_logs.txt","a");
-        
+
         $nProducts = [];
         if ($request->query->get('type') && $request->query->get('type') == 'full') {
-            
+
             $products = $this->namedProductsFinder->findAllByNamePart($request->query->get('query'), $this->maxLimit);
-            
+
             foreach ($products as $product) {
                 $context['groups'] = 'shop:product:read';
                 $nProducts [] = $this->normalizer->normalize($product, 'json', $context);
@@ -102,7 +102,7 @@ final class ListProductsByPartialNameAction extends ResourceController
         }
 
         $products = $this->namedProductsFinder->findAllByNamePart($request->query->get('query'), $this->minLimit);
-        
+
         /** @var ProductInterface $product */
         foreach ($products as $product) {
             if (null === $productMainTaxon = $product->getMainTaxon()) {

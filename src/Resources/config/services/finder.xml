@@ -13,6 +13,12 @@
             <argument type="service" id="bitbag_sylius_elasticsearch_plugin.facet.taxon_registry" />
         </service>
 
+        <service id="bitbag_sylius_elasticsearch_plugin.finder.api_products" class="BitBag\SyliusElasticsearchPlugin\Finder\ApiProductsFinder">
+            <argument type="service" id="bitbag_sylius_elasticsearch_plugin.query_builder.shop_products" />
+            <argument type="service" id="fos_elastica.finder.bitbag_shop_product" />
+            <argument type="service" id="bitbag_sylius_elasticsearch_plugin.facet.taxon_registry" />
+        </service>
+
         <service id="bitbag_sylius_elasticsearch_plugin.finder.product_options" class="BitBag\SyliusElasticsearchPlugin\Finder\ProductOptionsFinder">
             <argument type="service" id="fos_elastica.finder.bitbag_option_taxons" />
             <argument type="service" id="bitbag_sylius_elasticsearch_plugin.query_builder.product_options_by_taxon" />
