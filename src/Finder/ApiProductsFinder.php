@@ -66,4 +66,28 @@ final class ApiProductsFinder implements ApiProductsFinderInterface
 
         return $products;
     }
+
+    public function count(array $data): int
+    {
+        $boolQuery = $this->shopProductsQueryBuilder->buildQuery($data);
+
+        foreach ($data['facets'] as $facetId => $selectedBuckets) {
+            if (!$selectedBuckets) {
+                continue;
+            }
+
+            $facet = $this->facetRegistry->getFacetById($facetId);
+            $boolQuery->addFilter($facet->getQuery($selectedBuckets));
+        }
+
+        $query = new Query($boolQuery);
+        $query->addSort($data[SortDataHandlerInterface::SORT_INDEX]);
+        $query->setSize(9999999);
+
+
+        $count = $this->productFinder->findPaginated($query)->count();
+
+        return $count;
+    }
+
 }

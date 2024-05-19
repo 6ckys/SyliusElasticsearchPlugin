@@ -79,19 +79,19 @@ final class ListProductsAction
             'Order by must be one of these: asc, desc'
         );
 
+        $brands = $this->resolveQueryArrayParameter($request, 'brands', []);
+        $attributes = $this->resolveQueryArrayParameter($request, 'attributes', []);
+        $attributes = $this->handleQueryArrayParameter($attributes);
+        $options = $this->resolveQueryArrayParameter($request, 'options', []);
+        $options = $this->handleQueryArrayParameter($options);
+
         $requestData = [
             'name' => $name,
             'brands' => [
-                'brands' => []
+                'brands' => $brands
             ],
-            'options' => [],
-            'attributes' => [
-                'attribute_material' => [],
-                'attribute_color' => [],
-                'attribute_shipping-cost' => [],
-                'attribute_shipping-deliverytime' => [],
-                'attribute_condition' => []
-            ],
+            'options' => $options,
+            'attributes' => $attributes,
             'price' => [
                 'min_price' => $minPrice,
                 'max_price' => $maxPrice
@@ -120,6 +120,15 @@ final class ListProductsAction
 
         $request->setRequestFormat('json');
 
+        $totalItems = $this->apiProductsFinder->count($data);;
+        $paginationData = [
+            'totalItems' => $totalItems,
+            'itemsPerPage' => $itemsPerPage,
+            'currentPage' => $page,
+            'totalPages' => ceil($totalItems / $itemsPerPage),
+        ];
+        $nProducts [] = $paginationData;
+
         return $this->viewHandler->handle($configuration, View::create($nProducts));
 
     }
@@ -132,5 +141,25 @@ final class ListProductsAction
             $parameter = $defaultParameter;
         }
         return $parameter;
+    }
+
+    public function resolveQueryArrayParameter(Request $request, string $parameterName, array|int|string $defaultParameter): array|int|string
+    {
+        if ($request->query->has($parameterName)) {
+            $parameter = $request->query->getIterator()[$parameterName];
+        } else {
+            $parameter = $defaultParameter;
+        }
+        return $parameter;
+    }
+
+    public function handleQueryArrayParameter(array $arrayParameter): array
+    {
+        $handledArrayPrameter = [];
+        foreach ($arrayParameter as $parameter) {
+            list($parameterName, $parameterValue) = explode('=', $parameter, 2);
+            $handledArrayPrameter[$parameterName][] = $parameterValue;
+        }
+        return $handledArrayPrameter;
     }
 }

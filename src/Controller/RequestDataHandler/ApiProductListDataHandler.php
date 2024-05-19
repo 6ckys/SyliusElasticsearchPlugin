@@ -157,6 +157,7 @@ final class ApiProductListDataHandler implements DataHandlerInterface
     ): array {
         $reformattedValues = [];
         foreach ($attributeValues as $attributeValue) {
+            Assert::keyExists($attributesDefinitions, $property, $property.' does not exist.');
             switch ($attributesDefinitions[$property]) {
                 case CheckboxAttributeType::TYPE:
                     $value = (bool) ($attributeValue);
