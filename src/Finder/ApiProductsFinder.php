@@ -54,7 +54,6 @@ final class ApiProductsFinder implements ApiProductsFinderInterface
 
         $query = new Query($boolQuery);
         $query->addSort($data[SortDataHandlerInterface::SORT_INDEX]);
-        $query->setSize(9999999);
 
 
         $products = $this->productFinder->findPaginated($query);
