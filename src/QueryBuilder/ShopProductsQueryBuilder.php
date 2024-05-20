@@ -26,6 +26,7 @@ final class ShopProductsQueryBuilder implements QueryBuilderInterface
     private QueryBuilderInterface $hasTaxonQueryBuilder;
 
     private QueryBuilderInterface $hasBrandsQueryBuilder;
+
     private QueryBuilderInterface $hasOptionsQueryBuilder;
 
     private QueryBuilderInterface $hasAttributesQueryBuilder;

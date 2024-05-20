@@ -17,20 +17,21 @@ use BitBag\SyliusElasticsearchPlugin\Controller\RequestDataHandler\SortDataHandl
 use BitBag\SyliusElasticsearchPlugin\Facet\RegistryInterface;
 use BitBag\SyliusElasticsearchPlugin\QueryBuilder\QueryBuilderInterface;
 use Elastica\Query;
-use FOS\ElasticaBundle\Finder\FinderInterface;
+use FOS\ElasticaBundle\Finder\PaginatedFinderInterface;
+use Pagerfanta\Pagerfanta;
 
 final class ApiProductsFinder implements ApiProductsFinderInterface
 {
     private QueryBuilderInterface $shopProductsQueryBuilder;
 
-    private FinderInterface $productFinder;
+    private PaginatedFinderInterface $productFinder;
 
     /** @var RegistryInterface */
     private $facetRegistry;
 
     public function __construct(
         QueryBuilderInterface $shopProductsQueryBuilder,
-        FinderInterface $productFinder,
+        PaginatedFinderInterface $productFinder,
         RegistryInterface $facetRegistry
     ) {
         $this->shopProductsQueryBuilder = $shopProductsQueryBuilder;
@@ -38,36 +39,7 @@ final class ApiProductsFinder implements ApiProductsFinderInterface
         $this->facetRegistry = $facetRegistry;
     }
 
-    public function find(array $data): ?array
-    {
-        $boolQuery = $this->shopProductsQueryBuilder->buildQuery($data);
-
-        foreach ($data['facets'] as $facetId => $selectedBuckets) {
-            if (!$selectedBuckets) {
-                continue;
-            }
-
-            $facet = $this->facetRegistry->getFacetById($facetId);
-            $boolQuery->addFilter($facet->getQuery($selectedBuckets));
-        }
-
-        $query = new Query($boolQuery);
-        $query->addSort($data[SortDataHandlerInterface::SORT_INDEX]);
-
-        $options = [];
-        if (null !== $data[PaginationDataHandlerInterface::LIMIT_INDEX]) {
-            $options['size'] = $data[PaginationDataHandlerInterface::LIMIT_INDEX];
-        }
-        if (null !== $data[PaginationDataHandlerInterface::PAGE_INDEX]) {
-            $options['from'] = $data[PaginationDataHandlerInterface::PAGE_INDEX];
-        }
-
-        $products = $this->productFinder->find($query, $options['size'], $options);
-
-        return $products;
-    }
-
-    public function count(array $data): int
+    public function find(array $data): Pagerfanta
     {
         $boolQuery = $this->shopProductsQueryBuilder->buildQuery($data);
 
@@ -85,9 +57,15 @@ final class ApiProductsFinder implements ApiProductsFinderInterface
         $query->setSize(9999999);
 
 
-        $count = $this->productFinder->findPaginated($query)->count();
+        $products = $this->productFinder->findPaginated($query);
+        if (null !== $data[PaginationDataHandlerInterface::LIMIT_INDEX]) {
+            $products->setMaxPerPage($data[PaginationDataHandlerInterface::LIMIT_INDEX]);
+        }
+        if (null !== $data[PaginationDataHandlerInterface::PAGE_INDEX]) {
+            $products->setCurrentPage($data[PaginationDataHandlerInterface::PAGE_INDEX]);
+        }
 
-        return $count;
+        return $products;
     }
 
 }

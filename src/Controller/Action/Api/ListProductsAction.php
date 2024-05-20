@@ -17,6 +17,7 @@ use BitBag\SyliusElasticsearchPlugin\Controller\RequestDataHandler\DataHandlerIn
 use BitBag\SyliusElasticsearchPlugin\Controller\RequestDataHandler\PaginationDataHandlerInterface;
 use BitBag\SyliusElasticsearchPlugin\Controller\RequestDataHandler\SortDataHandlerInterface;
 use BitBag\SyliusElasticsearchPlugin\Finder\ApiProductsFinderInterface;
+use BitBag\SyliusElasticsearchPlugin\Model\SearchFacets;
 use FOS\RestBundle\View\View;
 use Sylius\Bundle\ResourceBundle\Controller\RequestConfigurationFactoryInterface;
 use Sylius\Bundle\ResourceBundle\Controller\ViewHandlerInterface;
@@ -96,7 +97,7 @@ final class ListProductsAction
                 'min_price' => $minPrice,
                 'max_price' => $maxPrice
             ],
-            'facets' => [],
+            'facets' => new SearchFacets(),
             'limit' => $itemsPerPage,
             'page' => $page,
             'order_by' => $orderBy,
@@ -110,7 +111,7 @@ final class ListProductsAction
             $this->paginationDataHandler->retrieveData($requestData)
         );
 
-        $products = $this->apiProductsFinder->find($data);
+        $products = $this->apiProductsFinder->find($data)->getCurrentPageResults();
         foreach ($products as $product) {
             $context['groups'] = 'shop:product:read';
             $nProducts [] = $this->normalizer->normalize($product, 'json', $context);
@@ -120,12 +121,16 @@ final class ListProductsAction
 
         $request->setRequestFormat('json');
 
-        $totalItems = $this->apiProductsFinder->count($data);;
         $paginationData = [
-            'totalItems' => $totalItems,
-            'itemsPerPage' => $itemsPerPage,
-            'currentPage' => $page,
-            'totalPages' => ceil($totalItems / $itemsPerPage),
+                'pagination' =>[
+                    'first' => 1,
+                    'current' => $this->apiProductsFinder->find($data)->getCurrentPage(),
+                    'last' => $this->apiProductsFinder->find($data)->getNbPages(),
+                    'previous' => ($this->apiProductsFinder->find($data)->getCurrentPage() > 1) ? $this->apiProductsFinder->find($data)->getPreviousPage() : 1,
+                    'next' => ($this->apiProductsFinder->find($data)->getCurrentPage() < $this->apiProductsFinder->find($data)->getNbPages()) ? $this->apiProductsFinder->find($data)->getNextPage() : $this->apiProductsFinder->find($data)->getNbPages(),
+                    'totalItems' => $this->apiProductsFinder->find($data)->count(),
+                    'perPage' => $this->apiProductsFinder->find($data)->getMaxPerPage(),
+                ]
         ];
         $nProducts [] = $paginationData;
 
