@@ -12,9 +12,12 @@ declare(strict_types=1);
 
 namespace BitBag\SyliusElasticsearchPlugin\Form\Type\ChoiceMapper;
 
+use Sylius\Component\Core\Model\TaxonInterface;
 use Sylius\Component\Product\Model\ProductAttributeInterface;
 
 interface ProductAttributesMapperInterface
 {
     public function mapToChoices(ProductAttributeInterface $productAttribute): array;
+
+    public function mapToChoicesApi(ProductAttributeInterface $productAttribute, TaxonInterface $taxon): array;
 }

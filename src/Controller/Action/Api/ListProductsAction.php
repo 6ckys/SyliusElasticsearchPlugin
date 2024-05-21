@@ -12,15 +12,24 @@ declare(strict_types=1);
 
 namespace BitBag\SyliusElasticsearchPlugin\Controller\Action\Api;
 
+use App\Entity\Product\ProductAttribute;
+use App\Entity\Product\ProductOption;
+use App\Entity\Taxonomy\Taxon;
 use App\Serializer\ProductNormalizer;
 use BitBag\SyliusElasticsearchPlugin\Controller\RequestDataHandler\DataHandlerInterface;
 use BitBag\SyliusElasticsearchPlugin\Controller\RequestDataHandler\PaginationDataHandlerInterface;
 use BitBag\SyliusElasticsearchPlugin\Controller\RequestDataHandler\SortDataHandlerInterface;
 use BitBag\SyliusElasticsearchPlugin\Finder\ApiProductsFinderInterface;
+use BitBag\SyliusElasticsearchPlugin\Finder\ProductAttributesFinder;
+use BitBag\SyliusElasticsearchPlugin\Finder\ProductBrandsFinder;
+use BitBag\SyliusElasticsearchPlugin\Finder\ProductOptionsFinder;
+use BitBag\SyliusElasticsearchPlugin\Form\Type\ChoiceMapper\ProductAttributesMapperInterface;
 use BitBag\SyliusElasticsearchPlugin\Model\SearchFacets;
+use BitBag\SyliusElasticsearchPlugin\PropertyNameResolver\ConcatedNameResolverInterface;
 use FOS\RestBundle\View\View;
 use Sylius\Bundle\ResourceBundle\Controller\RequestConfigurationFactoryInterface;
 use Sylius\Bundle\ResourceBundle\Controller\ViewHandlerInterface;
+use Sylius\Component\Core\Model\TaxonInterface;
 use Sylius\Component\Resource\Metadata\MetadataInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -36,6 +45,16 @@ final class ListProductsAction
 
     private ApiProductsFinderInterface $apiProductsFinder;
 
+    private ProductBrandsFinder $productBrandsFinder;
+
+    private ProductAttributesFinder $productAttributesFinder;
+
+    private ProductOptionsFinder $productOptionsFinder;
+
+    private ConcatedNameResolverInterface $attributeNameResolver;
+    private ProductAttributesMapperInterface $productAttributesMapper;
+    private array $excludedAttributes;
+
     public function __construct(
         DataHandlerInterface $apiProductListDataHandler,
         SortDataHandlerInterface $apiProductsSortDataHandler,
@@ -45,6 +64,12 @@ final class ListProductsAction
         RequestConfigurationFactoryInterface $requestConfigurationFactory,
         MetadataInterface $metadata,
         ViewHandlerInterface $viewHandler,
+        ProductBrandsFinder $productBrandsFinder,
+        ProductAttributesFinder $productAttributesFinder,
+        ProductOptionsFinder $productOptionsFinder,
+        ConcatedNameResolverInterface $attributeNameResolver,
+        ProductAttributesMapperInterface $productAttributesMapper,
+        array $excludedAttributes,
     ) {
         $this->apiProductListDataHandler = $apiProductListDataHandler;
         $this->apiProductsSortDataHandler = $apiProductsSortDataHandler;
@@ -54,6 +79,12 @@ final class ListProductsAction
         $this->requestConfigurationFactory = $requestConfigurationFactory;
         $this->metadata = $metadata;
         $this->viewHandler = $viewHandler;
+        $this->productBrandsFinder = $productBrandsFinder;
+        $this->productAttributesFinder = $productAttributesFinder;
+        $this->productOptionsFinder = $productOptionsFinder;
+        $this->attributeNameResolver = $attributeNameResolver;
+        $this->productAttributesMapper = $productAttributesMapper;
+        $this->excludedAttributes = $excludedAttributes;
     }
 
     public function __invoke(Request $request): Response
@@ -121,18 +152,8 @@ final class ListProductsAction
 
         $request->setRequestFormat('json');
 
-        $paginationData = [
-                'pagination' =>[
-                    'first' => 1,
-                    'current' => $this->apiProductsFinder->find($data)->getCurrentPage(),
-                    'last' => $this->apiProductsFinder->find($data)->getNbPages(),
-                    'previous' => ($this->apiProductsFinder->find($data)->getCurrentPage() > 1) ? $this->apiProductsFinder->find($data)->getPreviousPage() : 1,
-                    'next' => ($this->apiProductsFinder->find($data)->getCurrentPage() < $this->apiProductsFinder->find($data)->getNbPages()) ? $this->apiProductsFinder->find($data)->getNextPage() : $this->apiProductsFinder->find($data)->getNbPages(),
-                    'totalItems' => $this->apiProductsFinder->find($data)->count(),
-                    'perPage' => $this->apiProductsFinder->find($data)->getMaxPerPage(),
-                ]
-        ];
-        $nProducts [] = $paginationData;
+        $nProducts [] = $this->generatePaginationSection($data);
+        $nProducts [] = $this->generateFilterSection($data);
 
         return $this->viewHandler->handle($configuration, View::create($nProducts));
 
@@ -166,5 +187,99 @@ final class ListProductsAction
             $handledArrayPrameter[$parameterName][] = $parameterValue;
         }
         return $handledArrayPrameter;
+    }
+
+    public function generatePaginationSection(array $data): array
+    {
+        $paginationData = [
+            'pagination' =>[
+                'first' => 1,
+                'current' => $this->apiProductsFinder->find($data)->getCurrentPage(),
+                'last' => $this->apiProductsFinder->find($data)->getNbPages(),
+                'previous' => ($this->apiProductsFinder->find($data)->getCurrentPage() > 1) ? $this->apiProductsFinder->find($data)->getPreviousPage() : 1,
+                'next' => ($this->apiProductsFinder->find($data)->getCurrentPage() < $this->apiProductsFinder->find($data)->getNbPages()) ? $this->apiProductsFinder->find($data)->getNextPage() : $this->apiProductsFinder->find($data)->getNbPages(),
+                'totalItems' => $this->apiProductsFinder->find($data)->count(),
+                'perPage' => $this->apiProductsFinder->find($data)->getMaxPerPage(),
+            ]
+        ];
+        return $paginationData;
+    }
+
+    public function generateFilterSection(array $data): array
+    {
+        /** @var Taxon $taxon */
+        $taxon = $data['taxon'];
+        $brands = $this->generateFilterBrandsSection($taxon);
+        $attributes = $this->generateFilterAttributesSection($taxon);
+        $options = $this->generateFilterOptionsSection($taxon);
+        $filterData = [
+            'filter' =>[
+                $brands,
+                $attributes,
+                $options,
+            ]
+        ];
+        return $filterData;
+    }
+
+    public function generateFilterBrandsSection(TaxonInterface $taxon): array
+    {
+        $brands = $this->productBrandsFinder->findByTaxon($taxon);
+
+        $brandChoices = [];
+        foreach ($brands as $brand) {
+            $brandChoices[] = [
+                'code' => $brand->getCode(),
+                'name' => $brand->getName(),
+            ];
+        }
+
+        $filterData = [
+            'brands' => array_values($brandChoices),
+        ];
+        return $filterData;
+    }
+
+    public function generateFilterAttributesSection(TaxonInterface $taxon): array
+    {
+        $attributes = $this->productAttributesFinder->findByTaxon($taxon);
+
+        $attributeChoices = [];
+        $choices = [];
+        /** @var ProductAttribute $attribute */
+        foreach ($attributes as $attribute) {
+            $elasticCode = $this->attributeNameResolver->resolvePropertyName($attribute->getCode());
+            $choices = $this->productAttributesMapper->mapToChoicesApi($attribute, $taxon);
+            $attributeChoices[] = [
+                'code' => $elasticCode,
+                'name' => $attribute->getName(),
+                'values' => $choices,
+            ];
+        }
+
+        $filterData = [
+            'attributes' => array_values($attributeChoices),
+        ];
+        return $filterData;
+    }
+
+    public function generateFilterOptionsSection(TaxonInterface $taxon): array
+    {
+        $options = $this->productOptionsFinder->findByTaxon($taxon);
+
+        $optionChoices = [];
+        /** @var ProductOption $option */
+        foreach ($options as $option) {
+            $optionChoices[] = [
+                'code' => $option->getCode(),
+                'name' => $option->getName(),
+            ];
+        }
+
+        $filterData = [
+            'options' => array_values($optionChoices),
+        ];
+
+        return $filterData;
     }
 }

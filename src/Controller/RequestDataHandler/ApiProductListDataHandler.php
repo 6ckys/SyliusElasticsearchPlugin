@@ -82,6 +82,7 @@ final class ApiProductListDataHandler implements DataHandlerInterface
         $this->handleBrandsPrefixedProperty($requestData, $data);
         $this->handleOptionsPrefixedProperty($requestData, $data);
         $this->handleAttributesPrefixedProperty($requestData, $data, $attributesDefinitions);
+        $data['taxon'] = $taxon;
 
         return $data;
     }
