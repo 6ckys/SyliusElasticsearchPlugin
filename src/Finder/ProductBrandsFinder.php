@@ -41,6 +41,6 @@ final class ProductBrandsFinder implements ProductBrandsFinderInterface
 
         $query = $this->brandsByTaxonQueryBuilder->buildQuery($data);
 
-        return $this->brandsFinder->find($query, 20);
+        return $this->brandsFinder->find($query, 2000);
     }
 }

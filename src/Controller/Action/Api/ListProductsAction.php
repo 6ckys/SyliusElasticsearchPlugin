@@ -24,6 +24,7 @@ use BitBag\SyliusElasticsearchPlugin\Finder\ProductAttributesFinder;
 use BitBag\SyliusElasticsearchPlugin\Finder\ProductBrandsFinder;
 use BitBag\SyliusElasticsearchPlugin\Finder\ProductOptionsFinder;
 use BitBag\SyliusElasticsearchPlugin\Form\Type\ChoiceMapper\ProductAttributesMapperInterface;
+use BitBag\SyliusElasticsearchPlugin\Form\Type\ChoiceMapper\ProductOptionsMapperInterface;
 use BitBag\SyliusElasticsearchPlugin\Model\SearchFacets;
 use BitBag\SyliusElasticsearchPlugin\PropertyNameResolver\ConcatedNameResolverInterface;
 use FOS\RestBundle\View\View;
@@ -52,8 +53,12 @@ final class ListProductsAction
     private ProductOptionsFinder $productOptionsFinder;
 
     private ConcatedNameResolverInterface $attributeNameResolver;
+
     private ProductAttributesMapperInterface $productAttributesMapper;
-    private array $excludedAttributes;
+
+    private ConcatedNameResolverInterface $optionNameResolver;
+
+    private ProductOptionsMapperInterface $productOptionsMapper;
 
     public function __construct(
         DataHandlerInterface $apiProductListDataHandler,
@@ -69,7 +74,8 @@ final class ListProductsAction
         ProductOptionsFinder $productOptionsFinder,
         ConcatedNameResolverInterface $attributeNameResolver,
         ProductAttributesMapperInterface $productAttributesMapper,
-        array $excludedAttributes,
+        ConcatedNameResolverInterface $optionNameResolver,
+        ProductOptionsMapperInterface $productOptionsMapper,
     ) {
         $this->apiProductListDataHandler = $apiProductListDataHandler;
         $this->apiProductsSortDataHandler = $apiProductsSortDataHandler;
@@ -84,7 +90,8 @@ final class ListProductsAction
         $this->productOptionsFinder = $productOptionsFinder;
         $this->attributeNameResolver = $attributeNameResolver;
         $this->productAttributesMapper = $productAttributesMapper;
-        $this->excludedAttributes = $excludedAttributes;
+        $this->productOptionsMapper = $productOptionsMapper;
+        $this->optionNameResolver = $optionNameResolver;
     }
 
     public function __invoke(Request $request): Response
@@ -96,6 +103,7 @@ final class ListProductsAction
         $maxPrice = $this->resolveQueryParameter($request, 'maxPrice', null);
         $page = $this->resolveQueryParameter($request, 'page', 1);
         $itemsPerPage = $this->resolveQueryParameter($request, 'itemsPerPage', 8);
+        $showFilter = $this->resolveQueryParameter($request, 'showFilter', "yes");
 
         $orderBy = $this->resolveQueryParameter($request, 'orderBy', 'price');
         Assert::inArray(
@@ -153,7 +161,10 @@ final class ListProductsAction
         $request->setRequestFormat('json');
 
         $nProducts [] = $this->generatePaginationSection($data);
-        $nProducts [] = $this->generateFilterSection($data);
+        if($showFilter === "yes") {
+            $nProducts [] = $this->generateFilterSection($data, $requestData);
+        }
+        $nProducts [] = $this->generateTaxonSection($data);
 
         return $this->viewHandler->handle($configuration, View::create($nProducts));
 
@@ -205,12 +216,12 @@ final class ListProductsAction
         return $paginationData;
     }
 
-    public function generateFilterSection(array $data): array
+    public function generateFilterSection(array $data, array $requestData): array
     {
         /** @var Taxon $taxon */
         $taxon = $data['taxon'];
-        $brands = $this->generateFilterBrandsSection($taxon);
-        $attributes = $this->generateFilterAttributesSection($taxon);
+        $brands = $this->generateFilterBrandsSection($taxon, $data);
+        $attributes = $this->generateFilterAttributesSection($taxon, $requestData);
         $options = $this->generateFilterOptionsSection($taxon);
         $filterData = [
             'filter' =>[
@@ -222,16 +233,23 @@ final class ListProductsAction
         return $filterData;
     }
 
-    public function generateFilterBrandsSection(TaxonInterface $taxon): array
+    public function generateFilterBrandsSection(TaxonInterface $taxon, array $data): array
     {
         $brands = $this->productBrandsFinder->findByTaxon($taxon);
 
         $brandChoices = [];
         foreach ($brands as $brand) {
-            $brandChoices[] = [
+            $brandChoices[$brand->getCode()] = [
                 'code' => $brand->getCode(),
                 'name' => $brand->getName(),
+                'isSelectedForFilter' => false,
             ];
+        }
+
+        foreach ($data['brand'] as $brand) {
+            if(isset($brandChoices[$brand])){
+                $brandChoices[$brand]['isSelectedForFilter'] = true;
+            }
         }
 
         $filterData = [
@@ -240,21 +258,38 @@ final class ListProductsAction
         return $filterData;
     }
 
-    public function generateFilterAttributesSection(TaxonInterface $taxon): array
+    public function generateFilterAttributesSection(TaxonInterface $taxon, array $requestData): array
     {
         $attributes = $this->productAttributesFinder->findByTaxon($taxon);
 
         $attributeChoices = [];
-        $choices = [];
         /** @var ProductAttribute $attribute */
         foreach ($attributes as $attribute) {
             $elasticCode = $this->attributeNameResolver->resolvePropertyName($attribute->getCode());
             $choices = $this->productAttributesMapper->mapToChoicesApi($attribute, $taxon);
-            $attributeChoices[] = [
+            $attributeChoices[$elasticCode] = [
                 'code' => $elasticCode,
                 'name' => $attribute->getName(),
+                'isSelectedForFilter' => false,
                 'values' => $choices,
             ];
+        }
+
+        if(isset($requestData['attributes'])) {
+            foreach ($requestData['attributes'] as $key => $attributes) {
+                if (isset($attributeChoices[$key])) {
+                    $attributeChoices[$key]['isSelectedForFilter'] = true;
+                }
+                foreach ($attributes as $attributeCode){
+                    if (isset($attributeChoices[$key]['values'][$attributeCode])) {
+                        $attributeChoices[$key]['values'][$attributeCode]['isSelectedForFilter'] = true;
+                    }
+                }
+            }
+        }
+
+        foreach ($attributeChoices as &$attributeChoice) {
+            $attributeChoice['values'] = array_values($attributeChoice['values']);
         }
 
         $filterData = [
@@ -270,9 +305,14 @@ final class ListProductsAction
         $optionChoices = [];
         /** @var ProductOption $option */
         foreach ($options as $option) {
+            $optionCode = $this->optionNameResolver->resolvePropertyName($option->getCode());
+            $choices = $this->productOptionsMapper->mapToChoices($option);
+            $choices = array_unique($choices);
             $optionChoices[] = [
-                'code' => $option->getCode(),
+                'code' => $optionCode,
                 'name' => $option->getName(),
+                'isSelectedForFilter' => false,
+                'values' => $choices,
             ];
         }
 
@@ -281,5 +321,92 @@ final class ListProductsAction
         ];
 
         return $filterData;
+    }
+
+    public function generateTaxonSection(array $data): array
+    {
+        $taxon = $data['taxon'];
+        $taxonToGetName = $taxon;
+        $taxonFullName = $taxonToGetName->getName();
+        while($taxonToGetName->getParent()!==null){
+            $taxonToGetName = $taxonToGetName->getParent();
+            $taxonFullName= $taxonToGetName->getName()." / ".$taxonFullName;
+        }
+        $taxons['taxonAncestors'][$taxon->getCode()] = [
+            'code' => $taxon->getCode(),
+            'slug' => $taxon->getTranslations()->last()->getSlug(),
+            'name' => $taxon->getName(),
+            'fullName' => $taxonFullName,
+        ];
+        foreach ($taxon->getAncestors() as $oneSelectedTaxonAncestor){
+            $taxons['taxonAncestors'][$oneSelectedTaxonAncestor->getCode()] = [
+                'code' => $oneSelectedTaxonAncestor->getCode(),
+                'slug' => $oneSelectedTaxonAncestor->getTranslations()->last()->getSlug(),
+                'name' => $oneSelectedTaxonAncestor->getName()
+            ];
+        }
+        if(isset($taxons['taxonAncestors'])) {
+            $taxons['taxonAncestors'] = array_values($taxons['taxonAncestors']);
+        }
+        $taxons['taxonSelected'] = [
+            'code' => $taxon->getCode(),
+            'slug' => $taxon->getTranslations()->last()->getSlug(),
+            'name' => $taxon->getName(),
+            'fullName' => $taxonFullName,
+        ];
+        try {
+            $taxons['taxonSelected']['referenceableContent'] = [
+                'notIndexable' => $taxon->isNotIndexable(),
+                'metadataTitle' => $taxon->getMetadataTitle(),
+                'metadataDescription' => $taxon->getMetadataDescription()
+            ];
+        } catch (\Throwable $e) {
+            $taxons['taxonSelected']['referenceableContent'] = null;
+        }
+        try {
+            $taxons['taxonSelected']['referenceableContent']['openGraph'] = [
+                'openGraphMetadataTitle' => $taxon->getOpenGraphMetadataTitle(),
+                'openGraphMetadataDescription' => $taxon->getOpenGraphMetadataDescription(),
+                'openGraphMetadataUrl' => $taxon->getOpenGraphMetadataUrl(),
+                'openGraphMetadataImage' => $taxon->getOpenGraphMetadataImage(),
+                'openGraphMetadataType' => $taxon->getOpenGraphMetadataType(),
+            ];
+        } catch (\Throwable $e) {
+            if($taxons['taxonSelected']['referenceableContent'] !== null) {
+                $taxons['taxonSelected']['referenceableContent']['openGraph'] = null;
+            }
+        }
+        if ($taxon->getParent() !== null) {
+            $oneSelectedTaxonParent = $taxon->getParent();
+            $taxons['taxonParent'] = [
+                'code' => $oneSelectedTaxonParent->getCode(),
+                'slug' => $oneSelectedTaxonParent->getTranslations()->last()->getSlug(),
+                'name' => $oneSelectedTaxonParent->getName(),
+            ];
+            foreach ($oneSelectedTaxonParent->getEnabledChildren() as $oneSelectedTaxonParentChildren){
+                if($oneSelectedTaxonParentChildren!==$taxon) {
+                    $taxons['taxonSiblings'][$oneSelectedTaxonParentChildren->getCode()] = [
+                        'code' => $oneSelectedTaxonParentChildren->getCode(),
+                        'slug' => $oneSelectedTaxonParentChildren->getTranslations()->last()->getSlug(),
+                        'name' => $oneSelectedTaxonParentChildren->getName(),
+                    ];
+                }
+            }
+            if(isset($taxons['taxonSiblings'])) {
+                $taxons['taxonSiblings'] = array_values($taxons['taxonSiblings']);
+            }
+        }
+        foreach ($taxon->getEnabledChildren() as $oneSelectedTaxonChildren){
+            $taxons['taxonChildren'][$oneSelectedTaxonChildren->getCode()] = [
+                'code' => $oneSelectedTaxonChildren->getCode(),
+                'slug' => $oneSelectedTaxonChildren->getTranslations()->last()->getSlug(),
+                'name' => $oneSelectedTaxonChildren->getName(),
+            ];
+        }
+        if(isset($taxons['taxonChildren'])) {
+            $taxons['taxonChildren'] = array_values($taxons['taxonChildren']);
+        }
+        $taxons['filterTaxonName'] = $taxon->getName();
+        return $taxons;
     }
 }

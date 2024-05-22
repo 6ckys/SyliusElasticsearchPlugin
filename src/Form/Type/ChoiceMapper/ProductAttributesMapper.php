@@ -134,12 +134,20 @@ final class ProductAttributesMapper implements ProductAttributesMapperInterface
                 foreach ($value as $singleValue) {
                     $choice = $this->stringFormatter->formatToLowercaseWithoutSpaces($singleValue);
                     $label = $configuration['choices'][$singleValue][$this->localeContext->getLocaleCode()];
-                    $choices[$label] = $choice;
+                    $choices[$choice] = [
+                        'code' => $choice,
+                        'name' => $label,
+                        'isSelectedForFilter' => false,
+                    ];
                 }
             } else {
                 $choice = is_string($value) ? $this->stringFormatter->formatToLowercaseWithoutSpaces($value) : $value;
                 $choice = is_bool($value) ? var_export($value, true) : $choice;
-                $choices[$value] = $choice;
+                $choices[$choice] = [
+                    'code' => $choice,
+                    'name' => $value,
+                    'isSelectedForFilter' => false,
+                ];
             }
         });
         unset($attributeValues);
