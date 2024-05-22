@@ -112,10 +112,19 @@ final class ListProductsAction
         Assert::notNull($taxonSlug, 'taxonSlug cannot be null');
         $name = $this->resolveQueryParameter($request, 'name', null);
         $minPrice = $this->resolveQueryParameter($request, 'minPrice', null);
+        if($minPrice !== null) {
+            Assert::integer((int)$minPrice, 'minPrice must be an integer');
+        }
         $maxPrice = $this->resolveQueryParameter($request, 'maxPrice', null);
+        if($maxPrice !== null) {
+            Assert::integer((int)$maxPrice, 'maxPrice must be an integer');
+        }
         $page = $this->resolveQueryParameter($request, 'page', 1);
+        Assert::integer((int)$page, 'page must be an integer');
         $itemsPerPage = $this->resolveQueryParameter($request, 'itemsPerPage', 8);
+        Assert::integer((int)$itemsPerPage, 'itemsPerPage must be an integer');
         $showFilter = $this->resolveQueryParameter($request, 'showFilter', "yes");
+        Assert::inArray($showFilter, ["yes", "no"], 'showFilter must be yes or no');
 
         $orderBy = $this->resolveQueryParameter($request, 'orderBy', 'price');
         Assert::inArray(
@@ -165,7 +174,7 @@ final class ListProductsAction
         $products = $this->apiProductsFinder->find($data)->getCurrentPageResults();
         foreach ($products as $product) {
             $context['groups'] = 'shop:product:read';
-            $nProducts [] = $this->normalizer->normalize($product, 'json', $context);
+            $nProducts [0]['data'][] = $this->normalizer->normalize($product, 'json', $context);
         }
 
         $configuration = $this->requestConfigurationFactory->create($this->metadata, $request);
@@ -173,6 +182,7 @@ final class ListProductsAction
         $request->setRequestFormat('json');
 
         $nProducts [] = $this->generatePaginationSection($data);
+        $nProducts [] = $this->generatePriceSection($data, $requestData);
         $nProducts [] = $this->generateFilterSection($data, $requestData, $showFilter);
         $nProducts [] = $this->generateTaxonSection($data);
 
@@ -226,6 +236,39 @@ final class ListProductsAction
         return $paginationData;
     }
 
+    public function generatePriceSection(array $data, array $requestData): array
+    {
+        $priceData = [
+            'price' =>[
+                'minPrice' => $this->firstProductPriceFinderByOrderPrice($requestData, 'asc'),
+                'maxPrice' => $this->firstProductPriceFinderByOrderPrice($requestData, 'desc'),
+                'queryMinPrice' => isset($data['min_price']) ? (int)$data['min_price'] : null,
+                'queryMaxPrice' => isset($data['max_price']) ? (int)$data['max_price'] : null,
+            ]
+        ];
+        return $priceData;
+    }
+
+    public function firstProductPriceFinderByOrderPrice(array $requestData, string $sort): ?int
+    {
+        $requestData['order_by'] = 'price';
+        $requestData['sort'] = $sort;
+
+        $data = array_merge(
+            $this->apiProductListDataHandler->retrieveData($requestData),
+            $this->apiProductsSortDataHandler->retrieveData($requestData),
+            $this->paginationDataHandler->retrieveData($requestData)
+        );
+
+        try {
+            $productPrice = $this->apiProductsFinder->find($data)->getCurrentPageResults()[0]->getVariants()->first()->getChannelPricings()->first()->getPrice()/100;
+        }catch (\Throwable $e) {
+            $productPrice = null;
+        }
+
+        return $productPrice;
+    }
+
     public function generateFilterSection(array $data, array $requestData, string $showFilter): array
     {
         /** @var Taxon $taxon */
@@ -268,7 +311,7 @@ final class ListProductsAction
             $brandChoices[$brand->getCode()] = [
                 'code' => $brand->getCode(),
                 'name' => $brand->getName(),
-                'isSelectedForFilter' => false,
+                'isSelectedForFilter' => null,
             ];
         }
 
@@ -303,7 +346,7 @@ final class ListProductsAction
             $attributeChoices[$elasticCode] = [
                 'code' => $elasticCode,
                 'name' => $attribute->getName(),
-                'isSelectedForFilter' => false,
+                'isSelectedForFilter' => null,
                 'values' => $choices,
             ];
         }
@@ -351,7 +394,7 @@ final class ListProductsAction
             $optionChoices[] = [
                 'code' => $optionCode,
                 'name' => $option->getName(),
-                'isSelectedForFilter' => false,
+                'isSelectedForFilter' => null,
                 'values' => $choices,
             ];
         }

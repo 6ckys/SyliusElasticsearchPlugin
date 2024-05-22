@@ -138,7 +138,7 @@ final class ProductAttributesMapper implements ProductAttributesMapperInterface
                     $choices[$choice] = [
                         'code' => $choice,
                         'name' => $label,
-                        'isSelectedForFilter' => false,
+                        'isSelectedForFilter' => null,
                     ];
                 }
             } else {
@@ -147,7 +147,7 @@ final class ProductAttributesMapper implements ProductAttributesMapperInterface
                 $choices[$choice] = [
                     'code' => $choice,
                     'name' => $value,
-                    'isSelectedForFilter' => false,
+                    'isSelectedForFilter' => null,
                 ];
             }
         });
