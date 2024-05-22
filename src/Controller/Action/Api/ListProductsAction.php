@@ -60,6 +60,12 @@ final class ListProductsAction
 
     private ProductOptionsMapperInterface $productOptionsMapper;
 
+    private array $excludedAttributes;
+
+    private array $excludedBrands;
+
+    private array $excludedOptions;
+
     public function __construct(
         DataHandlerInterface $apiProductListDataHandler,
         SortDataHandlerInterface $apiProductsSortDataHandler,
@@ -76,6 +82,9 @@ final class ListProductsAction
         ProductAttributesMapperInterface $productAttributesMapper,
         ConcatedNameResolverInterface $optionNameResolver,
         ProductOptionsMapperInterface $productOptionsMapper,
+        array $excludedAttributes,
+        array $excludedBrands,
+        array $excludedOptions,
     ) {
         $this->apiProductListDataHandler = $apiProductListDataHandler;
         $this->apiProductsSortDataHandler = $apiProductsSortDataHandler;
@@ -92,6 +101,9 @@ final class ListProductsAction
         $this->productAttributesMapper = $productAttributesMapper;
         $this->productOptionsMapper = $productOptionsMapper;
         $this->optionNameResolver = $optionNameResolver;
+        $this->excludedAttributes = $excludedAttributes;
+        $this->excludedBrands = $excludedBrands;
+        $this->excludedOptions = $excludedOptions;
     }
 
     public function __invoke(Request $request): Response
@@ -161,9 +173,7 @@ final class ListProductsAction
         $request->setRequestFormat('json');
 
         $nProducts [] = $this->generatePaginationSection($data);
-        if($showFilter === "yes") {
-            $nProducts [] = $this->generateFilterSection($data, $requestData);
-        }
+        $nProducts [] = $this->generateFilterSection($data, $requestData, $showFilter);
         $nProducts [] = $this->generateTaxonSection($data);
 
         return $this->viewHandler->handle($configuration, View::create($nProducts));
@@ -216,29 +226,45 @@ final class ListProductsAction
         return $paginationData;
     }
 
-    public function generateFilterSection(array $data, array $requestData): array
+    public function generateFilterSection(array $data, array $requestData, string $showFilter): array
     {
         /** @var Taxon $taxon */
         $taxon = $data['taxon'];
         $brands = $this->generateFilterBrandsSection($taxon, $data);
-        $attributes = $this->generateFilterAttributesSection($taxon, $requestData);
-        $options = $this->generateFilterOptionsSection($taxon);
-        $filterData = [
-            'filter' =>[
-                $brands,
-                $attributes,
-                $options,
-            ]
-        ];
+        if($showFilter==="yes") {
+            $attributes = $this->generateFilterAttributesSection($taxon, $requestData);
+            $options = $this->generateFilterOptionsSection($taxon);
+            $filterData = [
+                'filter' =>[
+                    $brands,
+                    $attributes,
+                    $options,
+                ]
+            ];
+        } else {
+            $filterData = [
+                'filter' =>[
+                    $brands,
+                ]
+            ];
+        }
         return $filterData;
     }
 
     public function generateFilterBrandsSection(TaxonInterface $taxon, array $data): array
     {
         $brands = $this->productBrandsFinder->findByTaxon($taxon);
+        $excludedBrands= [];
+        foreach ($this->excludedBrands as $excludedBrand) {
+            $excludedBrands[$excludedBrand] = $excludedBrand;
+        }
+
 
         $brandChoices = [];
         foreach ($brands as $brand) {
+            if(isset($excludedBrands[$brand->getCode()])) {
+                continue;
+            }
             $brandChoices[$brand->getCode()] = [
                 'code' => $brand->getCode(),
                 'name' => $brand->getName(),
@@ -261,12 +287,19 @@ final class ListProductsAction
     public function generateFilterAttributesSection(TaxonInterface $taxon, array $requestData): array
     {
         $attributes = $this->productAttributesFinder->findByTaxon($taxon);
+        $excludedAttributes= [];
+        foreach ($this->excludedAttributes as $excludedAttribute) {
+            $excludedAttributes[$excludedAttribute] = $excludedAttribute;
+        }
 
         $attributeChoices = [];
         /** @var ProductAttribute $attribute */
         foreach ($attributes as $attribute) {
+            if(isset($excludedAttributes['attribute_'.$attribute->getCode()])){
+                continue;
+            }
             $elasticCode = $this->attributeNameResolver->resolvePropertyName($attribute->getCode());
-            $choices = $this->productAttributesMapper->mapToChoicesApi($attribute, $taxon);
+            $choices = $this->productAttributesMapper->mapToChoicesApi($attribute, $taxon, $excludedAttributes);
             $attributeChoices[$elasticCode] = [
                 'code' => $elasticCode,
                 'name' => $attribute->getName(),
@@ -301,10 +334,17 @@ final class ListProductsAction
     public function generateFilterOptionsSection(TaxonInterface $taxon): array
     {
         $options = $this->productOptionsFinder->findByTaxon($taxon);
+        $excludedOptions= [];
+        foreach ($this->excludedOptions as $excludedOption) {
+            $excludedOptions[$excludedOption] = $excludedOption;
+        }
 
         $optionChoices = [];
         /** @var ProductOption $option */
         foreach ($options as $option) {
+            if(isset($excludedAttributes['option_'.$option->getCode()])){
+                continue;
+            }
             $optionCode = $this->optionNameResolver->resolvePropertyName($option->getCode());
             $choices = $this->productOptionsMapper->mapToChoices($option);
             $choices = array_unique($choices);
@@ -407,6 +447,7 @@ final class ListProductsAction
             $taxons['taxonChildren'] = array_values($taxons['taxonChildren']);
         }
         $taxons['filterTaxonName'] = $taxon->getName();
+        $taxons['searchedName'] = $data['name'];
         return $taxons;
     }
 }

@@ -42,6 +42,9 @@
             <argument type="service" id="bitbag_sylius_elasticsearch_plugin.form.type.choice_mapper.product_attributes" />
             <argument type="service" id="bitbag_sylius_elasticsearch_plugin.property_name_resolver.option" />
             <argument type="service" id="bitbag_sylius_elasticsearch_plugin.form.type.choice_mapper.product_options" />
+            <argument>%bitbag_es_excluded_filter_attributes%</argument>
+            <argument>%bitbag_es_excluded_filter_brands%</argument>
+            <argument>%bitbag_es_excluded_filter_options%</argument>
             <tag name="controller.service_arguments" />
         </service>
     </services>

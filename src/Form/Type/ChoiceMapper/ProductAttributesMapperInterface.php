@@ -19,5 +19,5 @@ interface ProductAttributesMapperInterface
 {
     public function mapToChoices(ProductAttributeInterface $productAttribute): array;
 
-    public function mapToChoicesApi(ProductAttributeInterface $productAttribute, TaxonInterface $taxon): array;
+    public function mapToChoicesApi(ProductAttributeInterface $productAttribute, TaxonInterface $taxon, array $excludedAttributes): array;
 }

@@ -98,7 +98,7 @@ final class ProductAttributesMapper implements ProductAttributesMapperInterface
         return $choices;
     }
 
-    public function mapToChoicesApi(ProductAttributeInterface $productAttribute, TaxonInterface $taxon): array
+    public function mapToChoicesApi(ProductAttributeInterface $productAttribute, TaxonInterface $taxon, array $excludedAttributes): array
     {
         $configuration = $productAttribute->getConfiguration();
 
@@ -113,6 +113,7 @@ final class ProductAttributesMapper implements ProductAttributesMapperInterface
 
             return $choices;
         }
+
         $attributeValues = $this->productAttributeValueRepository->getUniqueAttributeValues($productAttribute, $taxon);
 
         foreach ($this->attributeMapper as $mapper) {
