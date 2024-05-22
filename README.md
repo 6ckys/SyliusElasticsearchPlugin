@@ -125,6 +125,137 @@ redirect_sylius_shop_product_index:
         _locale: ^[a-z]{2}(?:_[A-Z]{2})?$
         slug: .+
 ```
+
+...add this api to collectionOperations `config/api_platform/Product.xml`
+file.
+```
+<collectionOperation name="shop_get_elastic_products">
+                <attribute name="method">GET</attribute>
+                <attribute name="path">/shop/elastic-products/</attribute>
+                <attribute name="controller">bitbag_sylius_elasticsearch_plugin.controller.action.api.list_products</attribute>
+                <attribute name="read">false</attribute>
+                <attribute name="pagination_enabled">true</attribute>
+                <attribute name="openapi_context">
+                    <attribute name="summary">Get Products with Elasticsearch.</attribute>
+                    <attribute name="parameters">
+                        <attribute>
+                            <attribute name="name">taxonSlug</attribute>
+                            <attribute name="in">query</attribute>
+                            <attribute name="required">true</attribute>
+                            <attribute name="schema">
+                                <attribute name="type">string</attribute>
+                            </attribute>
+                        </attribute>
+                        <attribute>
+                            <attribute name="name">name</attribute>
+                            <attribute name="in">query</attribute>
+                            <attribute name="required">false</attribute>
+                            <attribute name="schema">
+                                <attribute name="type">string</attribute>
+                            </attribute>
+                        </attribute>
+                        <attribute>
+                            <attribute name="name">brands[]</attribute>
+                            <attribute name="in">query</attribute>
+                            <attribute name="description">Exemple: brand_code</attribute>
+                            <attribute name="required">false</attribute>
+                            <attribute name="is_collection">true</attribute>
+                            <attribute name="schema">
+                                <attribute name="type">array</attribute>
+                                <attribute name="items">
+                                    <attribute name="type">string</attribute>
+                                </attribute>
+                            </attribute>
+                        </attribute>
+                        <attribute>
+                            <attribute name="name">attributes[]</attribute>
+                            <attribute name="in">query</attribute>
+                            <attribute name="description">Exemple: attribute_name=value</attribute>
+                            <attribute name="required">false</attribute>
+                            <attribute name="is_collection">true</attribute>
+                            <attribute name="schema">
+                                <attribute name="type">array</attribute>
+                                <attribute name="items">
+                                    <attribute name="type">string</attribute>
+                                </attribute>
+                            </attribute>
+                        </attribute>
+                        <attribute>
+                            <attribute name="name">options[]</attribute>
+                            <attribute name="in">query</attribute>
+                            <attribute name="description">Exemple: option_name=value</attribute>
+                            <attribute name="required">false</attribute>
+                            <attribute name="is_collection">true</attribute>
+                            <attribute name="schema">
+                                <attribute name="type">array</attribute>
+                                <attribute name="items">
+                                    <attribute name="type">string</attribute>
+                                </attribute>
+                            </attribute>
+                        </attribute>
+                        <attribute>
+                            <attribute name="name">minPrice</attribute>
+                            <attribute name="in">query</attribute>
+                            <attribute name="required">false</attribute>
+                            <attribute name="schema">
+                                <attribute name="type">number</attribute>
+                            </attribute>
+                        </attribute>
+                        <attribute>
+                            <attribute name="name">maxPrice</attribute>
+                            <attribute name="in">query</attribute>
+                            <attribute name="required">false</attribute>
+                            <attribute name="schema">
+                                <attribute name="type">number</attribute>
+                            </attribute>
+                        </attribute>
+                        <attribute>
+                            <attribute name="name">orderBy</attribute>
+                            <attribute name="in">query</attribute>
+                            <attribute name="required">false</attribute>
+                            <attribute name="schema">
+                                <attribute name="type">string</attribute>
+                                <attribute name="enum">
+                                    <attribute>product_created_at</attribute>
+                                    <attribute>price</attribute>
+                                    <attribute>sold_units</attribute>
+                                </attribute>
+                            </attribute>
+                        </attribute>
+                        <attribute>
+                            <attribute name="name">sort</attribute>
+                            <attribute name="in">query</attribute>
+                            <attribute name="required">false</attribute>
+                            <attribute name="schema">
+                                <attribute name="type">string</attribute>
+                                <attribute name="enum">
+                                    <attribute>asc</attribute>
+                                    <attribute>desc</attribute>
+                                </attribute>
+                            </attribute>
+                        </attribute>
+                        <attribute>
+                            <attribute name="name">showFilter</attribute>
+                            <attribute name="in">query</attribute>
+                            <attribute name="required">false</attribute>
+                            <attribute name="schema">
+                                <attribute name="type">string</attribute>
+                                <attribute name="enum">
+                                    <attribute>yes</attribute>
+                                    <attribute>no</attribute>
+                                </attribute>
+                            </attribute>
+                        </attribute>
+                    </attribute>
+                    <attribute name="responses">
+                        <attribute name="200">
+                            <attribute name="description">Product collection response with Elasticsearch.</attribute>
+                            <attribute name="content">false</attribute>
+                        </attribute>
+                    </attribute>
+                </attribute>
+            </collectionOperation>
+```
 ...and update installed assets with the following command:
 ```
 $ bin/console assets:install
