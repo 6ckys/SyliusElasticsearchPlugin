@@ -249,7 +249,7 @@ final class ListProductsAction
         return $priceData;
     }
 
-    public function firstProductPriceFinderByOrderPrice(array $requestData, string $sort): ?int
+    public function firstProductPriceFinderByOrderPrice(array $requestData, string $sort): ?float
     {
         $requestData['order_by'] = 'price';
         $requestData['sort'] = $sort;
